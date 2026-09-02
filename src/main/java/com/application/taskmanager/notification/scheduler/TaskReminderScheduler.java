@@ -51,16 +51,22 @@ public class TaskReminderScheduler {
         processTaskReminders();
     }
 
+    @Transactional
     public void processTaskReminders() {
         Instant now = Instant.now();
 
         // 1. Transactionally discover and enqueue due reminders
         enqueueDueReminders(now);
+        emailNotificationRepository.flush();
 
         // 2. Fetch notifications ready for dispatch
         List<Long> pendingIds = getPendingNotificationIds(now);
 
-        // 3. Process each notification independently with clear transaction boundaries
+        if (!pendingIds.isEmpty()) {
+            log.info("Found {} pending task reminder notifications due at {}. Dispatching...", pendingIds.size(), now);
+        }
+
+        // 3. Process each notification independently
         for (Long notificationId : pendingIds) {
             try {
                 processSingleNotification(notificationId);
