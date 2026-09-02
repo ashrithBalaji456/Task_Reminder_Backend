@@ -69,8 +69,13 @@ public class MonthlyReportScheduler {
 
     @Transactional
     public void processMonthlyReportForUser(User user) {
+        processMonthlyReportForUser(user, false);
+    }
+
+    @Transactional
+    public void processMonthlyReportForUser(User user, boolean force) {
         UserEmailPreference preference = preferenceRepository.findByUserId(user.getId()).orElse(null);
-        if (preference != null && !preference.isMonthlyReportEnabled()) {
+        if (!force && preference != null && !preference.isMonthlyReportEnabled()) {
             return;
         }
 
@@ -83,7 +88,7 @@ public class MonthlyReportScheduler {
                 user.getId(), NotificationType.MONTHLY_REPORT, periodIdentifier
         );
 
-        if (alreadySent) {
+        if (!force && alreadySent) {
             return;
         }
 

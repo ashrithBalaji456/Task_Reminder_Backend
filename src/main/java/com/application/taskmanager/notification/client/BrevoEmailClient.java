@@ -24,11 +24,11 @@ public class BrevoEmailClient {
 
     public BrevoEmailClient(
             @Value("${app.brevo.api-key}") String apiKey,
-            @Value("${app.brevo.sender-email}") String senderEmail,
+            @Value("${app.brevo.sender-email:ashrithbalajigudla@gmail.com}") String senderEmail,
             @Value("${app.brevo.sender-name:Task Reminder Service}") String senderName) {
         this.apiKey = apiKey;
-        this.senderEmail = senderEmail;
-        this.senderName = senderName;
+        this.senderEmail = (senderEmail != null && !senderEmail.isBlank()) ? senderEmail : "ashrithbalajigudla@gmail.com";
+        this.senderName = (senderName != null && !senderName.isBlank()) ? senderName : "Task Reminder Service";
         this.restClient = RestClient.builder()
                 .baseUrl("https://api.brevo.com/v3")
                 .build();

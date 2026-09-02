@@ -70,8 +70,13 @@ public class WeeklyReportScheduler {
 
     @Transactional
     public void processWeeklyReportForUser(User user) {
+        processWeeklyReportForUser(user, false);
+    }
+
+    @Transactional
+    public void processWeeklyReportForUser(User user, boolean force) {
         UserEmailPreference preference = preferenceRepository.findByUserId(user.getId()).orElse(null);
-        if (preference != null && !preference.isWeeklyReportEnabled()) {
+        if (!force && preference != null && !preference.isWeeklyReportEnabled()) {
             return;
         }
 
@@ -84,7 +89,7 @@ public class WeeklyReportScheduler {
                 user.getId(), NotificationType.WEEKLY_REPORT, periodIdentifier
         );
 
-        if (alreadySent) {
+        if (!force && alreadySent) {
             return;
         }
 
