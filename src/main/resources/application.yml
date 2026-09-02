@@ -25,8 +25,8 @@ spring:
 app:
   jwt:
     secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
-    access-token-expiration-ms: ${JWT_ACCESS_TOKEN_EXPIRATION:86400000} # 24 hours
-    refresh-token-expiration-ms: ${JWT_REFRESH_TOKEN_EXPIRATION:604800000} # 7 days
+    access-token-expiration-ms: ${JWT_ACCESS_TOKEN_EXPIRATION:2592000000} # 30 days
+    refresh-token-expiration-ms: ${JWT_REFRESH_TOKEN_EXPIRATION:5184000000} # 60 days
 
   brevo:
     api-key: ${BREVO_API_KEY:}
