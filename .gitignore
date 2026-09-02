@@ -1,0 +1,38 @@
+# Target build directory
+target/
+*.jar
+*.war
+*.ear
+*.class
+
+# Logs
+*.log
+logs/
+
+# Environment and Secret Files
+.env
+.env.local
+*.env
+application-local.yml
+application-local.properties
+application-secret.yml
+application-secret.properties
+
+# IDE & Editor Files
+.idea/
+*.iml
+.eclipse/
+.project
+.classpath
+.settings/
+.vscode/
+*.swp
+*.swo
+
+# Operating System Files
+.DS_Store
+Thumbs.db
+
+# Crash logs
+hs_err_pid*
+replay_pid*
