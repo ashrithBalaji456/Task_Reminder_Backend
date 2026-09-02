@@ -34,6 +34,9 @@ public enum AppTimezone {
             return UTC.getZoneId();
         }
         String clean = input.trim();
+        if (clean.contains(" ")) {
+            clean = clean.split(" ")[0];
+        }
         for (AppTimezone tz : values()) {
             if (tz.name().equalsIgnoreCase(clean) || tz.getZoneId().equalsIgnoreCase(clean)) {
                 return tz.getZoneId();

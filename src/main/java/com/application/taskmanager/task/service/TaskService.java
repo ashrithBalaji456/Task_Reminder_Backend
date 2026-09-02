@@ -360,7 +360,8 @@ public class TaskService {
     }
 
     private Instant computeDueDateTime(LocalDate date, LocalTime time, String timezoneStr) {
-        ZoneId zoneId = ZoneId.of(timezoneStr != null ? timezoneStr : "UTC");
+        String normTz = com.application.taskmanager.user.model.AppTimezone.normalize(timezoneStr);
+        ZoneId zoneId = ZoneId.of(normTz);
         return LocalDateTime.of(date, time).atZone(zoneId).toInstant();
     }
 }
