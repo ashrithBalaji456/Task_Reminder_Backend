@@ -39,6 +39,12 @@ public class TaskService {
     public TaskResponse createTask(Long userId, CreateTaskRequest request) {
         User user = getUserOrThrow(userId);
 
+        if (request.getTimezone() != null && !request.getTimezone().isBlank()) {
+            String normTz = com.application.taskmanager.user.model.AppTimezone.normalize(request.getTimezone());
+            user.setTimezone(normTz);
+            userRepository.save(user);
+        }
+
         TaskType type = (request.isRecurring() || request.getTaskType() == TaskType.DAILY_RECURRING)
                 ? TaskType.DAILY_RECURRING : TaskType.ONE_TIME;
         RecurrenceType recType = (type == TaskType.DAILY_RECURRING)

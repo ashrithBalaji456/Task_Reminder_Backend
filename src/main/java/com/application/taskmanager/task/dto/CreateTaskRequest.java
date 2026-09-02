@@ -43,4 +43,6 @@ public class CreateTaskRequest {
     private ReminderOption reminderOption;
 
     private Integer customReminderMinutes;
+
+    private String timezone;
 }
