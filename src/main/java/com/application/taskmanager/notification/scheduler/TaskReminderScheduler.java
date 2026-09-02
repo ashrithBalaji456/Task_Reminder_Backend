@@ -24,6 +24,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
@@ -46,14 +48,23 @@ public class TaskReminderScheduler {
     @Scheduled(fixedRate = 60000)
     public void scheduledCronJob() {
         if (!schedulingEnabled) {
+            log.warn("[REMINDER-SCHEDULER] Scheduling is explicitly disabled via configuration");
             return;
         }
-        processTaskReminders();
+        try {
+            processTaskReminders();
+        } catch (Exception ex) {
+            log.error("[REMINDER-SCHEDULER] Exception during task reminder processing loop: {}", ex.getMessage(), ex);
+        }
     }
 
     @Transactional
     public void processTaskReminders() {
         Instant now = Instant.now();
+        ZoneId serverZone = ZoneId.systemDefault();
+
+        log.info("[REMINDER-SCHEDULER] START | Server time: {} | Server Zone: {} | UTC Instant: {}",
+                LocalDateTime.now(serverZone), serverZone, now);
 
         // 1. Transactionally discover and enqueue due reminders
         enqueueDueReminders(now);
@@ -61,19 +72,18 @@ public class TaskReminderScheduler {
 
         // 2. Fetch notifications ready for dispatch
         List<Long> pendingIds = getPendingNotificationIds(now);
-
-        if (!pendingIds.isEmpty()) {
-            log.info("Found {} pending task reminder notifications due at {}. Dispatching...", pendingIds.size(), now);
-        }
+        log.info("[REMINDER-SCHEDULER] Found {} pending reminder notifications due for dispatch", pendingIds.size());
 
         // 3. Process each notification independently
         for (Long notificationId : pendingIds) {
             try {
                 processSingleNotification(notificationId);
             } catch (Exception e) {
-                log.error("Error dispatching notification id {}: {}", notificationId, e.getMessage());
+                log.error("[REMINDER-SCHEDULER] Error processing notification ID {}: {}", notificationId, e.getMessage(), e);
             }
         }
+
+        log.info("[REMINDER-SCHEDULER] END");
     }
 
     @Transactional
@@ -87,6 +97,7 @@ public class TaskReminderScheduler {
             User user = occurrence.getUser();
             UserEmailPreference preference = preferenceRepository.findByUserId(user.getId()).orElse(null);
             if (preference != null && !preference.isTaskReminderEnabled() && !preference.isPushNotificationEnabled()) {
+                log.info("[REMINDER-SCHEDULER] SKIPPED occurrence ID {} because all notification channels are disabled for user ID {}", occurrence.getId(), user.getId());
                 continue;
             }
 
@@ -106,7 +117,8 @@ public class TaskReminderScheduler {
                         .build();
 
                 emailNotificationRepository.save(notification);
-                log.info("Enqueued PENDING reminder notification id {} for task occurrence id {}", notification.getId(), occurrence.getId());
+                log.info("[REMINDER-SCHEDULER] ENQUEUED PENDING reminder notification ID {} for task occurrence ID '{}' (due at {})",
+                        notification.getId(), occurrence.getTitle(), occurrence.getDueDateTime());
             }
         }
     }
@@ -119,20 +131,17 @@ public class TaskReminderScheduler {
                 .toList();
     }
 
-    /**
-     * Non-blocking multi-step dispatch flow:
-     * Step A: Claim notification transactionally (PENDING -> PROCESSING)
-     * Step B: Perform external network calls OUTSIDE transaction (Brevo Email & Web Push)
-     * Step C: Record final result transactionally (SENT or FAILED/RETRY)
-     */
     public void processSingleNotification(Long notificationId) {
-        // Step A: Claim notification
+        log.info("[REMINDER-DISPATCHER] Attempting to claim notification ID: {}", notificationId);
         ClaimedNotification claimed = claimNotification(notificationId);
         if (claimed == null) {
-            return; // Already processed or claimed by another worker
+            log.info("[REMINDER-DISPATCHER] Notification ID {} skipped (already claimed or task not pending)", notificationId);
+            return;
         }
 
-        // Step B: External Network Dispatch (NO OPEN TRANSACTION)
+        log.info("[REMINDER-DISPATCHER] Claimed notification ID: {} | User: {} | Task: '{}' | Attempt #{}",
+                notificationId, claimed.userEmail, claimed.taskTitle, 1);
+
         boolean emailSuccess = false;
         boolean pushSuccess = false;
         String providerMsgId = null;
@@ -141,6 +150,7 @@ public class TaskReminderScheduler {
         try {
             // Channel 1: Email via Brevo
             if (claimed.isEmailEnabled) {
+                log.info("[REMINDER-DISPATCHER] [EMAIL] Sending Brevo email for notification ID {} to {}", notificationId, claimed.userEmail);
                 try {
                     providerMsgId = emailSenderService.sendEmail(
                             claimed.userEmail, claimed.userName,
@@ -148,31 +158,40 @@ public class TaskReminderScheduler {
                             claimed.emailHtml
                     );
                     emailSuccess = true;
+                    log.info("[REMINDER-DISPATCHER] [EMAIL] Brevo email sent successfully. MsgId: {}", providerMsgId);
                 } catch (Exception ex) {
-                    log.error("Brevo Email delivery failed for notification id {}: {}", notificationId, ex.getMessage());
+                    log.error("[REMINDER-DISPATCHER] [EMAIL] Brevo delivery failed for notification ID {}: {}", notificationId, ex.getMessage(), ex);
                     failureMessage = "Email error: " + ex.getMessage();
                 }
+            } else {
+                log.info("[REMINDER-DISPATCHER] [EMAIL] Skipped (channel disabled in user preferences)");
             }
 
             // Channel 2: Web Push Notifications
-            if (claimed.isPushEnabled && claimed.activeSubscriptions != null) {
+            if (claimed.isPushEnabled && claimed.activeSubscriptions != null && !claimed.activeSubscriptions.isEmpty()) {
+                log.info("[REMINDER-DISPATCHER] [PUSH] Found {} active Web Push subscriptions for user {}", claimed.activeSubscriptions.size(), claimed.userName);
                 for (PushSubscription sub : claimed.activeSubscriptions) {
                     try {
+                        log.info("[REMINDER-DISPATCHER] [PUSH] Dispatching push to endpoint: {}", sub.getEndpoint());
                         boolean ok = webPushService.sendPushNotification(sub, claimed.pushTitle, claimed.pushBody, "/tasks");
-                        if (ok) pushSuccess = true;
+                        if (ok) {
+                            pushSuccess = true;
+                            log.info("[REMINDER-DISPATCHER] [PUSH] Push notification delivered successfully");
+                        }
                     } catch (Exception ex) {
-                        log.error("Web Push delivery failed for endpoint {}: {}", sub.getEndpoint(), ex.getMessage());
+                        log.error("[REMINDER-DISPATCHER] [PUSH] Push delivery failed for endpoint {}: {}", sub.getEndpoint(), ex.getMessage(), ex);
                     }
                 }
+            } else {
+                log.info("[REMINDER-DISPATCHER] [PUSH] Skipped (channel disabled or no active device subscriptions)");
             }
         } catch (Exception ex) {
             failureMessage = ex.getMessage();
         }
 
         boolean overallSuccess = emailSuccess || pushSuccess || (!claimed.isEmailEnabled && !claimed.isPushEnabled);
-
-        // Step C: Update notification record in DB
         recordNotificationResult(notificationId, overallSuccess, providerMsgId != null ? providerMsgId : "MULTI_CHANNEL_SENT", failureMessage);
+        log.info("[REMINDER-DISPATCHER] Notification ID {} completed with result: {}", notificationId, overallSuccess ? "SENT" : "FAILED");
     }
 
     @Transactional
