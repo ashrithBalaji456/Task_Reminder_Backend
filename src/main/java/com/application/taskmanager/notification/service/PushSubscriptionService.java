@@ -24,7 +24,7 @@ public class PushSubscriptionService {
     private final PushSubscriptionRepository pushSubscriptionRepository;
     private final UserRepository userRepository;
 
-    @Value("${app.vapid.public-key:BEl62iUYgUivxIkv69yViEuiBIa-Ib9-Skv69yViEuiBIa-Ib9-S}")
+    @Value("${app.vapid.public-key:BJIwL4mA3CEFwx50mAvSKHCxxIrjjLsfJZu2F1Of0r446101Q2kSB7Wm-pJK91i3QxPuPintSJ3vnS5XWfxf9fk}")
     private String vapidPublicKey;
 
     public String getVapidPublicKey() {

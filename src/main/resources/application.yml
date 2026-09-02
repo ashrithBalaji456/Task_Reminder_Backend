@@ -28,6 +28,11 @@ app:
     access-token-expiration-ms: ${JWT_ACCESS_TOKEN_EXPIRATION:2592000000} # 30 days
     refresh-token-expiration-ms: ${JWT_REFRESH_TOKEN_EXPIRATION:5184000000} # 60 days
 
+  vapid:
+    public-key: ${VAPID_PUBLIC_KEY:BJIwL4mA3CEFwx50mAvSKHCxxIrjjLsfJZu2F1Of0r446101Q2kSB7Wm-pJK91i3QxPuPintSJ3vnS5XWfxf9fk}
+    private-key: ${VAPID_PRIVATE_KEY:hOeFEoSpCgryCJH_QYCO_BdV5ZID_lzsvWCarwBoPl8}
+    subject: ${VAPID_SUBJECT:mailto:ashrithbalajigudla@gmail.com}
+
   brevo:
     api-key: ${BREVO_API_KEY:}
     sender-email: ${BREVO_SENDER_EMAIL:ashrithbalajigudla@gmail.com}
