@@ -14,7 +14,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/v1/health")
+@RequestMapping({"/health", "/api/v1/health"})
 @RequiredArgsConstructor
 @Tag(name = "System Health", description = "Endpoint for checking service health, database connectivity, and uptime")
 public class HealthController {
