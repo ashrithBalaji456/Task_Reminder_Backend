@@ -32,6 +32,12 @@ public class TaskResponse {
     private Instant dueDateTime;
     private ReminderOption reminderOption;
     private Integer customReminderMinutes;
+    private Integer repeatFrequencyMinutes;
+    private String repeatStopCondition;
+    private Integer maxReminderCount;
+    private Integer reminderSentCount;
+    private Boolean notifyByEmail;
+    private Boolean notifyByPush;
     private Instant reminderScheduledAt;
     private TaskStatus status;
     private boolean recurring;

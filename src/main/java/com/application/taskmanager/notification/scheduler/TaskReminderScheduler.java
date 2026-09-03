@@ -227,6 +227,11 @@ public class TaskReminderScheduler {
             User user = notification.getUser();
             UserEmailPreference preference = preferenceRepository.findByUserId(user.getId()).orElse(null);
 
+            boolean isEmailEnabled = (preference == null || preference.isTaskReminderEnabled())
+                    && (occurrence == null || occurrence.getNotifyByEmail() == null || occurrence.getNotifyByEmail());
+            boolean isPushEnabled = (preference == null || preference.isPushNotificationEnabled())
+                    && (occurrence == null || occurrence.getNotifyByPush() == null || occurrence.getNotifyByPush());
+
             long remainingMins = Math.max(0, Duration.between(Instant.now(), occurrence.getDueDateTime()).toMinutes());
             String remainingStr = remainingMins > 60
                     ? (remainingMins / 60) + " hours " + (remainingMins % 60) + " minutes"
@@ -248,14 +253,15 @@ public class TaskReminderScheduler {
 
             return new ClaimedNotification(
                     notificationId,
+                    occurrence.getId(),
                     user.getEmail(),
                     user.getName(),
                     occurrence.getTitle(),
                     html,
                     pushTitle,
                     pushBody,
-                    preference == null || preference.isTaskReminderEnabled(),
-                    preference == null || preference.isPushNotificationEnabled(),
+                    isEmailEnabled,
+                    isPushEnabled,
                     activeSubs,
                     newAttemptCount
             );
@@ -268,10 +274,45 @@ public class TaskReminderScheduler {
             if (opt.isEmpty()) return;
 
             EmailNotification notification = opt.get();
+            TaskOccurrence occurrence = notification.getTaskOccurrence();
+
             if (success) {
                 notification.setStatus(NotificationStatus.SENT);
                 notification.setSentAt(Instant.now());
                 notification.setProviderMessageId(msgId);
+
+                // Handle repeat reminder frequency scheduling
+                if (occurrence != null && occurrence.getStatus() == TaskStatus.PENDING) {
+                    int sentCount = (occurrence.getReminderSentCount() != null ? occurrence.getReminderSentCount() : 0) + 1;
+                    occurrence.setReminderSentCount(sentCount);
+
+                    Integer repeatFreq = occurrence.getRepeatFrequencyMinutes();
+                    String stopCondition = occurrence.getRepeatStopCondition() != null ? occurrence.getRepeatStopCondition() : "UNTIL_TASK_TIME";
+                    Integer maxCount = occurrence.getMaxReminderCount() != null ? occurrence.getMaxReminderCount() : 5;
+
+                    boolean shouldRepeat = repeatFreq != null && repeatFreq > 0;
+                    if ("AFTER_MAX_COUNT".equalsIgnoreCase(stopCondition) && sentCount >= maxCount) {
+                        shouldRepeat = false;
+                    }
+
+                    if (shouldRepeat) {
+                        Instant nextReminderAt = Instant.now().plus(Duration.ofMinutes(repeatFreq));
+                        if (nextReminderAt.isBefore(occurrence.getDueDateTime())) {
+                            occurrence.setReminderScheduledAt(nextReminderAt);
+                            taskOccurrenceRepository.save(occurrence);
+                            log.info("[REMINDER-SCHEDULER] SCHEDULED REPEAT REMINDER #{} for task occurrence ID {} at {}",
+                                    sentCount + 1, occurrence.getId(), nextReminderAt);
+                        } else {
+                            occurrence.setReminderScheduledAt(null);
+                            taskOccurrenceRepository.save(occurrence);
+                            log.info("[REMINDER-SCHEDULER] REPEAT REMINDERS ENDED for task occurrence ID {} (next reminder would exceed due time)", occurrence.getId());
+                        }
+                    } else {
+                        occurrence.setReminderScheduledAt(null);
+                        taskOccurrenceRepository.save(occurrence);
+                        log.info("[REMINDER-SCHEDULER] REPEAT REMINDERS COMPLETED for task occurrence ID {} (sent count: {})", occurrence.getId(), sentCount);
+                    }
+                }
             } else {
                 notification.setFailureReason(failureReason);
                 if (notification.getAttemptCount() >= notification.getMaxAttempts()) {
@@ -288,6 +329,7 @@ public class TaskReminderScheduler {
 
     public record ClaimedNotification(
             Long notificationId,
+            Long occurrenceId,
             String userEmail,
             String userName,
             String taskTitle,

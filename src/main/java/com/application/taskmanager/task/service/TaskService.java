@@ -45,12 +45,22 @@ public class TaskService {
             userRepository.save(user);
         }
 
+        Instant dueDateTime = computeDueDateTime(request.getDueDate(), request.getDueTime(), user.getTimezone());
+        if (dueDateTime.isBefore(Instant.now().minusSeconds(60))) {
+            throw new InvalidTaskOperationException("Task due date and time cannot be in the past. Please choose a future date and time.");
+        }
+
         TaskType type = (request.isRecurring() || request.getTaskType() == TaskType.DAILY_RECURRING)
                 ? TaskType.DAILY_RECURRING : TaskType.ONE_TIME;
         RecurrenceType recType = (type == TaskType.DAILY_RECURRING)
                 ? RecurrenceType.DAILY : RecurrenceType.NONE;
 
         ReminderOption remOption = request.getReminderOption() != null ? request.getReminderOption() : ReminderOption.NONE;
+        Integer repeatFreq = request.getRepeatFrequencyMinutes();
+        String repeatStop = request.getRepeatStopCondition() != null ? request.getRepeatStopCondition() : "UNTIL_TASK_TIME";
+        Integer maxCount = request.getMaxReminderCount() != null ? request.getMaxReminderCount() : 5;
+        Boolean notifyEmail = request.getNotifyByEmail() != null ? request.getNotifyByEmail() : true;
+        Boolean notifyPush = request.getNotifyByPush() != null ? request.getNotifyByPush() : true;
 
         TaskDefinition definition = TaskDefinition.builder()
                 .user(user)
@@ -63,12 +73,16 @@ public class TaskService {
                 .dueTime(request.getDueTime())
                 .reminderOption(remOption)
                 .customReminderMinutes(request.getCustomReminderMinutes())
+                .repeatFrequencyMinutes(repeatFreq)
+                .repeatStopCondition(repeatStop)
+                .maxReminderCount(maxCount)
+                .notifyByEmail(notifyEmail)
+                .notifyByPush(notifyPush)
                 .locked(false)
                 .build();
 
         TaskDefinition savedDefinition = taskDefinitionRepository.save(definition);
 
-        Instant dueDateTime = computeDueDateTime(request.getDueDate(), request.getDueTime(), user.getTimezone());
         Instant reminderScheduledAt = calculateReminderScheduledAt(dueDateTime, remOption, request.getCustomReminderMinutes());
 
         TaskOccurrence occurrence = TaskOccurrence.builder()
@@ -82,6 +96,12 @@ public class TaskService {
                 .dueDateTime(dueDateTime)
                 .reminderOption(remOption)
                 .customReminderMinutes(request.getCustomReminderMinutes())
+                .repeatFrequencyMinutes(repeatFreq)
+                .repeatStopCondition(repeatStop)
+                .maxReminderCount(maxCount)
+                .reminderSentCount(0)
+                .notifyByEmail(notifyEmail)
+                .notifyByPush(notifyPush)
                 .reminderScheduledAt(reminderScheduledAt)
                 .status(TaskStatus.PENDING)
                 .build();
@@ -178,6 +198,9 @@ public class TaskService {
 
         LocalDate newDate = request.getDueDate() != null ? request.getDueDate() : occurrence.getOccurrenceDate();
         Instant dueDateTime = computeDueDateTime(newDate, request.getDueTime(), user.getTimezone());
+        if (dueDateTime.isBefore(Instant.now().minusSeconds(60))) {
+            throw new InvalidTaskOperationException("Task due date and time cannot be in the past. Please choose a future date and time.");
+        }
 
         ReminderOption remOption = request.getReminderOption() != null ? request.getReminderOption() : occurrence.getReminderOption();
         Integer customMins = request.getCustomReminderMinutes() != null ? request.getCustomReminderMinutes() : occurrence.getCustomReminderMinutes();
@@ -191,6 +214,11 @@ public class TaskService {
         occurrence.setDueDateTime(dueDateTime);
         occurrence.setReminderOption(remOption);
         occurrence.setCustomReminderMinutes(customMins);
+        if (request.getRepeatFrequencyMinutes() != null) occurrence.setRepeatFrequencyMinutes(request.getRepeatFrequencyMinutes());
+        if (request.getRepeatStopCondition() != null) occurrence.setRepeatStopCondition(request.getRepeatStopCondition());
+        if (request.getMaxReminderCount() != null) occurrence.setMaxReminderCount(request.getMaxReminderCount());
+        if (request.getNotifyByEmail() != null) occurrence.setNotifyByEmail(request.getNotifyByEmail());
+        if (request.getNotifyByPush() != null) occurrence.setNotifyByPush(request.getNotifyByPush());
         occurrence.setReminderScheduledAt(reminderScheduledAt);
 
         TaskOccurrence updated = taskOccurrenceRepository.save(occurrence);
@@ -204,6 +232,11 @@ public class TaskService {
             def.setDueTime(request.getDueTime());
             def.setReminderOption(remOption);
             def.setCustomReminderMinutes(customMins);
+            if (request.getRepeatFrequencyMinutes() != null) def.setRepeatFrequencyMinutes(request.getRepeatFrequencyMinutes());
+            if (request.getRepeatStopCondition() != null) def.setRepeatStopCondition(request.getRepeatStopCondition());
+            if (request.getMaxReminderCount() != null) def.setMaxReminderCount(request.getMaxReminderCount());
+            if (request.getNotifyByEmail() != null) def.setNotifyByEmail(request.getNotifyByEmail());
+            if (request.getNotifyByPush() != null) def.setNotifyByPush(request.getNotifyByPush());
             taskDefinitionRepository.save(def);
         }
 
@@ -234,6 +267,7 @@ public class TaskService {
 
         occurrence.setStatus(TaskStatus.COMPLETED);
         occurrence.setCompletedAt(Instant.now());
+        occurrence.setReminderScheduledAt(null); // Cancel future repeat reminders
         TaskOccurrence saved = taskOccurrenceRepository.save(occurrence);
         log.info("Task occurrence id {} completed by user id {}", occurrenceId, userId);
 

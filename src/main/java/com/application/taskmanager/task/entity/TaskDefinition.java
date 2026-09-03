@@ -59,6 +59,25 @@ public class TaskDefinition {
     @Column(name = "custom_reminder_minutes")
     private Integer customReminderMinutes;
 
+    @Column(name = "repeat_frequency_minutes")
+    private Integer repeatFrequencyMinutes;
+
+    @Column(name = "repeat_stop_condition", length = 30)
+    @Builder.Default
+    private String repeatStopCondition = "UNTIL_TASK_TIME";
+
+    @Column(name = "max_reminder_count")
+    @Builder.Default
+    private Integer maxReminderCount = 5;
+
+    @Column(name = "notify_by_email")
+    @Builder.Default
+    private Boolean notifyByEmail = true;
+
+    @Column(name = "notify_by_push")
+    @Builder.Default
+    private Boolean notifyByPush = true;
+
     @Column(nullable = false)
     @Builder.Default
     private boolean locked = false;

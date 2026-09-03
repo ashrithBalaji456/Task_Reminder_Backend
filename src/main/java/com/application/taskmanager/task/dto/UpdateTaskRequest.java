@@ -34,4 +34,14 @@ public class UpdateTaskRequest {
     private ReminderOption reminderOption;
 
     private Integer customReminderMinutes;
+
+    private Integer repeatFrequencyMinutes;
+
+    private String repeatStopCondition;
+
+    private Integer maxReminderCount;
+
+    private Boolean notifyByEmail;
+
+    private Boolean notifyByPush;
 }

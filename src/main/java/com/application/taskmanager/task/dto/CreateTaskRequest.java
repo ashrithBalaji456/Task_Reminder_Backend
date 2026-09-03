@@ -44,5 +44,15 @@ public class CreateTaskRequest {
 
     private Integer customReminderMinutes;
 
+    private Integer repeatFrequencyMinutes;
+
+    private String repeatStopCondition;
+
+    private Integer maxReminderCount;
+
+    private Boolean notifyByEmail;
+
+    private Boolean notifyByPush;
+
     private String timezone;
 }
