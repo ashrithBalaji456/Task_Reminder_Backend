@@ -1,9 +1,12 @@
 package com.application.taskmanager.notification.controller;
 
 import com.application.taskmanager.exception.ResourceNotFoundException;
+import com.application.taskmanager.notification.entity.PushSubscription;
+import com.application.taskmanager.notification.repository.PushSubscriptionRepository;
 import com.application.taskmanager.notification.scheduler.MonthlyReportScheduler;
 import com.application.taskmanager.notification.scheduler.WeeklyReportScheduler;
 import com.application.taskmanager.notification.service.EmailSenderService;
+import com.application.taskmanager.notification.service.WebPushService;
 import com.application.taskmanager.notification.template.TaskReminderEmailTemplate;
 import com.application.taskmanager.security.UserPrincipal;
 import com.application.taskmanager.user.entity.User;
@@ -14,6 +17,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -27,6 +31,8 @@ public class NotificationTestController {
     private final TaskReminderEmailTemplate reminderEmailTemplate;
     private final WeeklyReportScheduler weeklyReportScheduler;
     private final MonthlyReportScheduler monthlyReportScheduler;
+    private final PushSubscriptionRepository pushSubscriptionRepository;
+    private final WebPushService webPushService;
 
     @PostMapping("/reminder")
     public ResponseEntity<?> sendTestReminderEmail(
@@ -51,6 +57,37 @@ public class NotificationTestController {
                 "success", true,
                 "message", "Test reminder email dispatched via Brevo successfully to " + user.getEmail(),
                 "messageId", messageId
+        ));
+    }
+
+    @PostMapping("/push")
+    public ResponseEntity<?> sendTestPushNotification(@AuthenticationPrincipal UserPrincipal userPrincipal) {
+        User user = userRepository.findById(userPrincipal.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        List<PushSubscription> subs = pushSubscriptionRepository.findByUserIdAndActiveTrue(user.getId());
+        if (subs.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "No active mobile push subscriptions found for this account. Please enable Web Push in Settings first!"
+            ));
+        }
+
+        int deliveredCount = 0;
+        for (PushSubscription sub : subs) {
+            boolean ok = webPushService.sendPushNotification(
+                    sub,
+                    "🌸 Test Mobile Push Alert",
+                    "Hello " + user.getName() + "! Native Web Push notification delivery is working perfectly on your device.",
+                    "/dashboard"
+            );
+            if (ok) deliveredCount++;
+        }
+
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Dispatched VAPID Web Push alert to " + deliveredCount + " active device(s)!",
+                "deliveredDevices", deliveredCount
         ));
     }
 
