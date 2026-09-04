@@ -79,9 +79,8 @@ public class WebPushService {
                     subscription.getP256dhKey(),
                     subscription.getAuthKey(),
                     payloadJson,
-                    86400
+                    Urgency.HIGH
             );
-            notification.setUrgency(Urgency.HIGH);
 
             org.apache.http.HttpResponse response = service.send(notification);
             int statusCode = response.getStatusLine().getStatusCode();
