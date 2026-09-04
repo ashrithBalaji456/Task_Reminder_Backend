@@ -54,7 +54,6 @@ public class HistoryService {
                 : 0.0;
 
         List<TaskResponse> taskResponses = occurrences.stream()
-                .filter(o -> o.getStatus() != TaskStatus.CANCELLED)
                 .map(taskMapper::toTaskResponse)
                 .collect(Collectors.toList());
 

@@ -22,4 +22,10 @@ public class DashboardResponse {
     private long mediumPriorityPendingCount;
     private long lowPriorityPendingCount;
     private double completionPercentage;
+
+    private long allTimeTotalTasks;
+    private long allTimeCompletedTasks;
+    private long allTimePendingTasks;
+    private long allTimeCancelledTasks;
+    private double allTimeCompletionPercentage;
 }

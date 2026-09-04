@@ -58,6 +58,15 @@ public class DashboardService {
                 ? Math.round(((double) completedTasks / activeTotalTasks * 100.0) * 100.0) / 100.0
                 : 0.0;
 
+        List<TaskOccurrence> allOccurrences = taskOccurrenceRepository.findAllByUserIdOrdered(userId);
+        long allTimeActive = allOccurrences.stream().filter(o -> o.getStatus() != TaskStatus.CANCELLED).count();
+        long allTimeCompleted = allOccurrences.stream().filter(o -> o.getStatus() == TaskStatus.COMPLETED).count();
+        long allTimePending = allOccurrences.stream().filter(o -> o.getStatus() == TaskStatus.PENDING).count();
+        long allTimeCancelled = allOccurrences.stream().filter(o -> o.getStatus() == TaskStatus.CANCELLED).count();
+        double allTimeCompletionRate = allTimeActive > 0
+                ? Math.round(((double) allTimeCompleted / allTimeActive * 100.0) * 100.0) / 100.0
+                : 0.0;
+
         return DashboardResponse.builder()
                 .date(queryDate)
                 .totalTasks(activeTotalTasks)
@@ -68,6 +77,11 @@ public class DashboardService {
                 .mediumPriorityPendingCount(mediumPriorityPending)
                 .lowPriorityPendingCount(lowPriorityPending)
                 .completionPercentage(completionPercentage)
+                .allTimeTotalTasks(allTimeActive)
+                .allTimeCompletedTasks(allTimeCompleted)
+                .allTimePendingTasks(allTimePending)
+                .allTimeCancelledTasks(allTimeCancelled)
+                .allTimeCompletionPercentage(allTimeCompletionRate)
                 .build();
     }
 }
