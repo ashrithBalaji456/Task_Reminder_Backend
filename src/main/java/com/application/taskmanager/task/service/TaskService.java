@@ -127,7 +127,7 @@ public class TaskService {
 
         List<TaskOccurrence> occurrences = taskOccurrenceRepository.findByUserIdAndOccurrenceDateOrdered(userId, date);
         return occurrences.stream()
-                .filter(o -> o.getStatus() != TaskStatus.CANCELLED)
+                .filter(o -> o.getStatus() == TaskStatus.PENDING)
                 .map(taskMapper::toTaskResponse)
                 .collect(Collectors.toList());
     }

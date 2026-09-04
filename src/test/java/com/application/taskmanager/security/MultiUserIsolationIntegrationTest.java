@@ -76,7 +76,7 @@ class MultiUserIsolationIntegrationTest {
                 .title("User A Confidential Task")
                 .description("Secret description")
                 .priority(Priority.HIGH)
-                .dueDate(LocalDate.now())
+                .dueDate(LocalDate.now().plusDays(1))
                 .dueTime(LocalTime.of(10, 0))
                 .build();
 
