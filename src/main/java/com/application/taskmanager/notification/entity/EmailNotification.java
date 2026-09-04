@@ -10,7 +10,15 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.Instant;
 
 @Entity
-@Table(name = "email_notifications")
+@Table(
+    name = "email_notifications",
+    uniqueConstraints = {
+        @UniqueConstraint(
+            name = "uk_email_notif_occurrence_scheduled",
+            columnNames = {"task_occurrence_id", "scheduled_for", "notification_type"}
+        )
+    }
+)
 @Getter
 @Setter
 @NoArgsConstructor

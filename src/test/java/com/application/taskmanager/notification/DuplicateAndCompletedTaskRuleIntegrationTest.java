@@ -144,4 +144,47 @@ class DuplicateAndCompletedTaskRuleIntegrationTest {
         // Brevo email client must NEVER be called
         verify(brevoEmailClient, never()).sendEmail(any(), any(), any(), any(), any());
     }
+
+    @Test
+    @DisplayName("All 5 repeat reminders are delivered for 2-minute interval before due time")
+    void testRepeatReminders_AllOccurrencesDelivered() {
+        LocalDate today = LocalDate.now(userZone);
+        LocalTime dueTime = LocalTime.now(userZone).plusMinutes(10);
+
+        CreateTaskRequest create = CreateTaskRequest.builder()
+                .title("Notify Task")
+                .priority(Priority.HIGH)
+                .dueDate(today)
+                .dueTime(dueTime)
+                .reminderOption(ReminderOption.TEN_MINUTES)
+                .repeatFrequencyMinutes(2)
+                .repeatStopCondition("UNTIL_TASK_TIME")
+                .maxReminderCount(5)
+                .notifyByEmail(true)
+                .notifyByPush(true)
+                .build();
+
+        TaskResponse task = taskService.createTask(userId, create);
+        assertNotNull(task.getReminderScheduledAt());
+
+        clearInvocations(brevoEmailClient);
+
+        // Run scheduler 5 successive times, advancing occurrence scheduled time to due/now on each step
+        for (int i = 0; i < 5; i++) {
+            com.application.taskmanager.task.entity.TaskOccurrence occurrence = taskOccurrenceRepository.findById(task.getId()).orElseThrow();
+            occurrence.setReminderScheduledAt(java.time.Instant.now().minusSeconds(1));
+            taskOccurrenceRepository.saveAndFlush(occurrence);
+
+            reminderScheduler.processTaskReminders();
+        }
+
+        // Brevo email client should be invoked exactly 5 times (once for each occurrence)
+        verify(brevoEmailClient, times(5)).sendEmail(any(), any(), any(), any(), any());
+
+        List<EmailNotification> notifications = notificationRepository.findAll();
+        assertEquals(5, notifications.size());
+        for (EmailNotification notif : notifications) {
+            assertEquals(NotificationStatus.SENT, notif.getStatus());
+        }
+    }
 }

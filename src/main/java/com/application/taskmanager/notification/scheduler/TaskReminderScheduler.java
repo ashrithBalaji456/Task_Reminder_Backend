@@ -46,6 +46,9 @@ public class TaskReminderScheduler {
     @Value("${app.scheduling.enabled:true}")
     private boolean schedulingEnabled;
 
+    @Value("${app.scheduling.late-window-minutes:60}")
+    private int lateWindowMinutes;
+
     @Scheduled(fixedRate = 60000)
     public void scheduledCronJob() {
         if (!schedulingEnabled) {
@@ -92,33 +95,71 @@ public class TaskReminderScheduler {
                     .filter(o -> o.getReminderScheduledAt() != null && !o.getReminderScheduledAt().isAfter(now))
                     .toList();
 
+            Instant lateCutoff = now.minus(Duration.ofMinutes(lateWindowMinutes));
+
             for (TaskOccurrence occurrence : occurrencesToRemind) {
                 User user = occurrence.getUser();
                 UserEmailPreference preference = preferenceRepository.findByUserId(user.getId()).orElse(null);
-                if (preference != null && !preference.isTaskReminderEnabled() && !preference.isPushNotificationEnabled()) {
+                
+                boolean pushEnabled = (preference == null || preference.isPushNotificationEnabled())
+                        && (occurrence.getNotifyByPush() == null || occurrence.getNotifyByPush());
+                boolean emailEnabled = (preference == null || preference.isTaskReminderEnabled())
+                        && (occurrence.getNotifyByEmail() == null || occurrence.getNotifyByEmail());
+
+                if (!emailEnabled && !pushEnabled) {
                     log.info("[REMINDER-SCHEDULER] SKIPPED occurrence ID {} because all notification channels are disabled for user ID {}", occurrence.getId(), user.getId());
                     continue;
                 }
 
-                boolean exists = emailNotificationRepository.existsByTaskOccurrenceIdAndNotificationType(
-                        occurrence.getId(), NotificationType.TASK_REMINDER
+                Instant scheduledTime = occurrence.getReminderScheduledAt();
+                if (scheduledTime.isBefore(lateCutoff)) {
+                    log.warn("[REMINDER-SCHEDULER] SKIPPED occurrence ID {} for taskId={} because scheduled reminder time {} is past late processing window of {} mins",
+                            occurrence.getId(), occurrence.getId(), scheduledTime, lateWindowMinutes);
+                    Integer repeatFreq = occurrence.getRepeatFrequencyMinutes();
+                    if (repeatFreq != null && repeatFreq > 0) {
+                        Instant next = scheduledTime.plus(Duration.ofMinutes(repeatFreq));
+                        occurrence.setReminderScheduledAt(next.isBefore(occurrence.getDueDateTime()) ? next : null);
+                    } else {
+                        occurrence.setReminderScheduledAt(null);
+                    }
+                    taskOccurrenceRepository.save(occurrence);
+                    continue;
+                }
+
+                boolean alreadyDelivered = emailNotificationRepository.existsByTaskOccurrenceIdAndNotificationTypeAndScheduledFor(
+                        occurrence.getId(), NotificationType.TASK_REMINDER, scheduledTime
                 );
 
-                if (!exists) {
-                    EmailNotification notification = EmailNotification.builder()
-                            .user(user)
-                            .taskOccurrence(occurrence)
-                            .notificationType(NotificationType.TASK_REMINDER)
-                            .scheduledFor(occurrence.getReminderScheduledAt())
-                            .status(NotificationStatus.PENDING)
-                            .attemptCount(0)
-                            .maxAttempts(3)
-                            .build();
+                log.info("[REMINDER-SCHEDULER]\ntaskId={}\ndueTime={}\nfirstReminder={}\ninterval={} minutes\nnow={}\noccurrence={}\nalreadyDelivered={}\npushEnabled={}\nemailEnabled={}",
+                        occurrence.getId(),
+                        occurrence.getDueTime(),
+                        occurrence.getReminderOption(),
+                        occurrence.getRepeatFrequencyMinutes() != null ? occurrence.getRepeatFrequencyMinutes() : 0,
+                        now,
+                        scheduledTime,
+                        alreadyDelivered,
+                        pushEnabled,
+                        emailEnabled
+                );
 
-                    emailNotificationRepository.save(notification);
-                    log.info("[REMINDER-SCHEDULER] ENQUEUED PENDING reminder notification ID {} for task occurrence ID '{}' (due at {})",
-                            notification.getId(), occurrence.getTitle(), occurrence.getDueDateTime());
+                if (alreadyDelivered) {
+                    log.info("[REMINDER-SCHEDULER] Skipping occurrence {} for taskId={} because this exact occurrence already exists with SENT status.", scheduledTime, occurrence.getId());
+                    continue;
                 }
+
+                EmailNotification notification = EmailNotification.builder()
+                        .user(user)
+                        .taskOccurrence(occurrence)
+                        .notificationType(NotificationType.TASK_REMINDER)
+                        .scheduledFor(scheduledTime)
+                        .status(NotificationStatus.PENDING)
+                        .attemptCount(0)
+                        .maxAttempts(3)
+                        .build();
+
+                emailNotificationRepository.save(notification);
+                log.info("[REMINDER-SCHEDULER] ENQUEUED PENDING reminder notification ID {} for task occurrence ID '{}' (scheduledFor: {}, due at {})",
+                        notification.getId(), occurrence.getTitle(), scheduledTime, occurrence.getDueDateTime());
             }
             emailNotificationRepository.flush();
         });
@@ -296,7 +337,8 @@ public class TaskReminderScheduler {
                     }
 
                     if (shouldRepeat) {
-                        Instant nextReminderAt = Instant.now().plus(Duration.ofMinutes(repeatFreq));
+                        Instant baseTime = notification.getScheduledFor() != null ? notification.getScheduledFor() : (occurrence.getReminderScheduledAt() != null ? occurrence.getReminderScheduledAt() : Instant.now());
+                        Instant nextReminderAt = baseTime.plus(Duration.ofMinutes(repeatFreq));
                         if (nextReminderAt.isBefore(occurrence.getDueDateTime())) {
                             occurrence.setReminderScheduledAt(nextReminderAt);
                             taskOccurrenceRepository.save(occurrence);
@@ -305,7 +347,7 @@ public class TaskReminderScheduler {
                         } else {
                             occurrence.setReminderScheduledAt(null);
                             taskOccurrenceRepository.save(occurrence);
-                            log.info("[REMINDER-SCHEDULER] REPEAT REMINDERS ENDED for task occurrence ID {} (next reminder would exceed due time)", occurrence.getId());
+                            log.info("[REMINDER-SCHEDULER] REPEAT REMINDERS ENDED for task occurrence ID {} (next reminder {} would reach or exceed due time {})", occurrence.getId(), nextReminderAt, occurrence.getDueDateTime());
                         }
                     } else {
                         occurrence.setReminderScheduledAt(null);

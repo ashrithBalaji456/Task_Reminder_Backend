@@ -39,6 +39,9 @@ class WeeklyAndMonthlyAnalyticsTest {
     @Autowired
     private AnalyticsService analyticsService;
 
+    @Autowired
+    private com.application.taskmanager.task.repository.TaskOccurrenceRepository taskOccurrenceRepository;
+
     private Long userId;
 
     @BeforeEach
@@ -60,23 +63,29 @@ class WeeklyAndMonthlyAnalyticsTest {
         LocalDate prevWeekMonday = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).minusWeeks(1);
         LocalDate prevWeekTuesday = prevWeekMonday.plusDays(1);
 
-        // Create 2 tasks for previous completed week
+        // Create 2 tasks for previous completed week by updating occurrenceDate post-creation
         CreateTaskRequest task1 = CreateTaskRequest.builder()
                 .title("Task 1")
                 .priority(Priority.HIGH)
-                .dueDate(prevWeekMonday)
-                .dueTime(LocalTime.of(9, 0))
+                .dueDate(today)
+                .dueTime(LocalTime.now().plusHours(2))
                 .build();
         TaskResponse t1 = taskService.createTask(userId, task1);
+        var occ1 = taskOccurrenceRepository.findById(t1.getId()).orElseThrow();
+        occ1.setOccurrenceDate(prevWeekMonday);
+        taskOccurrenceRepository.save(occ1);
         taskService.completeTask(userId, t1.getId());
 
         CreateTaskRequest task2 = CreateTaskRequest.builder()
                 .title("Task 2")
                 .priority(Priority.MEDIUM)
-                .dueDate(prevWeekTuesday)
-                .dueTime(LocalTime.of(14, 0))
+                .dueDate(today)
+                .dueTime(LocalTime.now().plusHours(3))
                 .build();
-        taskService.createTask(userId, task2);
+        TaskResponse t2 = taskService.createTask(userId, task2);
+        var occ2 = taskOccurrenceRepository.findById(t2.getId()).orElseThrow();
+        occ2.setOccurrenceDate(prevWeekTuesday);
+        taskOccurrenceRepository.save(occ2);
 
         WeeklyAnalyticsResponse analytics = analyticsService.getWeeklyAnalytics(userId, today);
 

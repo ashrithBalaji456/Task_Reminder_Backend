@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ReminderTimingTest {
 
-    private final TaskService taskService = new TaskService(null, null, null, null, null);
+    private final TaskService taskService = new TaskService(null, null, null, null, null, null);
 
     @Test
     @DisplayName("Should correctly calculate reminder scheduled time for 10_MINUTES")

@@ -65,7 +65,7 @@ class RecurringTaskIntegrationTest {
                 .description("Daily vitamin intake")
                 .priority(Priority.HIGH)
                 .dueDate(today)
-                .dueTime(LocalTime.of(8, 0))
+                .dueTime(LocalTime.now(userZone).plusHours(2))
                 .recurring(true)
                 .build();
 

@@ -33,6 +33,7 @@ public class TaskService {
     private final TaskOccurrenceRepository taskOccurrenceRepository;
     private final TaskMovementHistoryRepository movementHistoryRepository;
     private final UserRepository userRepository;
+    private final com.application.taskmanager.notification.repository.EmailNotificationRepository emailNotificationRepository;
     private final TaskMapper taskMapper;
 
     @Transactional
@@ -268,8 +269,9 @@ public class TaskService {
         occurrence.setStatus(TaskStatus.COMPLETED);
         occurrence.setCompletedAt(Instant.now());
         occurrence.setReminderScheduledAt(null); // Cancel future repeat reminders
+        emailNotificationRepository.cancelPendingNotificationsForOccurrence(occurrenceId);
         TaskOccurrence saved = taskOccurrenceRepository.save(occurrence);
-        log.info("Task occurrence id {} completed by user id {}", occurrenceId, userId);
+        log.info("Task occurrence id {} completed by user id {}, cancelled pending notifications", occurrenceId, userId);
 
         return taskMapper.toTaskResponse(saved);
     }

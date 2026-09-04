@@ -42,6 +42,9 @@ class TaskServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private com.application.taskmanager.notification.repository.EmailNotificationRepository emailNotificationRepository;
+
     @Spy
     private TaskMapper taskMapper = new TaskMapper();
 
