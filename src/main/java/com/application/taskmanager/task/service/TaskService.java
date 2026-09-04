@@ -126,7 +126,10 @@ public class TaskService {
         materializeOccurrencesForUserAndDate(user, date);
 
         List<TaskOccurrence> occurrences = taskOccurrenceRepository.findByUserIdAndOccurrenceDateOrdered(userId, date);
-        return occurrences.stream().map(taskMapper::toTaskResponse).collect(Collectors.toList());
+        return occurrences.stream()
+                .filter(o -> o.getStatus() != TaskStatus.CANCELLED)
+                .map(taskMapper::toTaskResponse)
+                .collect(Collectors.toList());
     }
 
     @Transactional
@@ -250,10 +253,21 @@ public class TaskService {
                 .orElseThrow(() -> new ResourceNotFoundException("Task occurrence not found with id: " + occurrenceId));
 
         TaskDefinition def = occurrence.getTaskDefinition();
-        taskOccurrenceRepository.delete(occurrence);
 
-        if (def != null && def.getTaskType() == TaskType.ONE_TIME) {
-            taskDefinitionRepository.delete(def);
+        if (def != null && def.getTaskType() == TaskType.DAILY_RECURRING) {
+            // For recurring tasks, set occurrence status to CANCELLED so materializer does not re-create it
+            occurrence.setStatus(TaskStatus.CANCELLED);
+            occurrence.setReminderScheduledAt(null);
+            emailNotificationRepository.cancelPendingNotificationsForOccurrence(occurrenceId);
+            taskOccurrenceRepository.save(occurrence);
+            log.info("Cancelled recurring task occurrence id {} for user id {}", occurrenceId, userId);
+        } else {
+            // For one-time tasks, delete occurrence and definition
+            taskOccurrenceRepository.delete(occurrence);
+            if (def != null && def.getTaskType() == TaskType.ONE_TIME) {
+                taskDefinitionRepository.delete(def);
+            }
+            log.info("Deleted task occurrence id {} for user id {}", occurrenceId, userId);
         }
     }
 
