@@ -58,6 +58,8 @@ public interface TaskOccurrenceRepository extends JpaRepository<TaskOccurrence, 
 
     long countByUserIdAndOccurrenceDateAndStatusAndPriority(Long userId, LocalDate date, TaskStatus status, Priority priority);
 
+    long countByTaskDefinitionId(Long taskDefinitionId);
+
     @Query("SELECT o FROM TaskOccurrence o WHERE o.user.id = :userId ORDER BY o.occurrenceDate DESC, o.dueTime DESC")
     List<TaskOccurrence> findAllByUserIdOrdered(@Param("userId") Long userId);
 }

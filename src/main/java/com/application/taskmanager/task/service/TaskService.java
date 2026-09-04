@@ -270,9 +270,19 @@ public class TaskService {
         // Permanently delete task occurrence row from database
         taskOccurrenceRepository.delete(occurrence);
 
-        // If one-time task definition, delete definition as well
-        if (def != null && def.getTaskType() == TaskType.ONE_TIME) {
-            taskDefinitionRepository.delete(def);
+        // Handle task definition cleanup to prevent automatic re-materialization
+        if (def != null) {
+            if (def.getTaskType() == TaskType.DAILY_RECURRING) {
+                def.setTaskType(TaskType.ONE_TIME);
+                def.setRecurrenceType(RecurrenceType.NONE);
+                taskDefinitionRepository.save(def);
+                log.info("Converted daily recurring def id {} to ONE_TIME on occurrence deletion to prevent re-materialization", def.getId());
+            }
+            long remaining = taskOccurrenceRepository.countByTaskDefinitionId(def.getId());
+            if (remaining == 0) {
+                taskDefinitionRepository.delete(def);
+                log.info("Deleted task definition id {}", def.getId());
+            }
         }
 
         log.info("Permanently deleted task occurrence id {} for user id {}", occurrenceId, userId);
