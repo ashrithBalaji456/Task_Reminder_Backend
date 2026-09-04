@@ -267,21 +267,23 @@ public class TaskService {
         // Cancel any pending notifications for this occurrence
         emailNotificationRepository.cancelPendingNotificationsForOccurrence(occurrenceId);
 
-        // Permanently delete task occurrence row from database
+        // Permanently delete task occurrence row from database and flush persistence context
         taskOccurrenceRepository.delete(occurrence);
+        taskOccurrenceRepository.flush();
 
-        // Handle task definition cleanup to prevent automatic re-materialization
+        // Handle task definition cleanup to prevent automatic re-materialization on refresh
         if (def != null) {
-            if (def.getTaskType() == TaskType.DAILY_RECURRING) {
-                def.setTaskType(TaskType.ONE_TIME);
-                def.setRecurrenceType(RecurrenceType.NONE);
-                taskDefinitionRepository.save(def);
-                log.info("Converted daily recurring def id {} to ONE_TIME on occurrence deletion to prevent re-materialization", def.getId());
-            }
             long remaining = taskOccurrenceRepository.countByTaskDefinitionId(def.getId());
             if (remaining == 0) {
                 taskDefinitionRepository.delete(def);
-                log.info("Deleted task definition id {}", def.getId());
+                taskDefinitionRepository.flush();
+                log.info("Deleted orphaned task definition id {}", def.getId());
+            } else {
+                def.setTaskType(TaskType.ONE_TIME);
+                def.setRecurrenceType(RecurrenceType.NONE);
+                def.setLocked(true);
+                taskDefinitionRepository.saveAndFlush(def);
+                log.info("Locked and converted daily recurring def id {} to ONE_TIME to prevent re-materialization on refresh", def.getId());
             }
         }
 
@@ -376,6 +378,15 @@ public class TaskService {
 
         for (TaskDefinition def : activeDefinitions) {
             if (def.isLocked()) continue;
+            if (def.getTaskType() != TaskType.DAILY_RECURRING) continue;
+
+            long occurrencesCount = taskOccurrenceRepository.countByTaskDefinitionId(def.getId());
+            if (occurrencesCount == 0) {
+                taskDefinitionRepository.delete(def);
+                taskDefinitionRepository.flush();
+                log.info("Cleaned up orphaned task definition id {} with 0 occurrences during materialization", def.getId());
+                continue;
+            }
 
             boolean exists = taskOccurrenceRepository
                     .existsByUserIdAndTaskDefinitionIdAndOccurrenceDate(user.getId(), def.getId(), date);
