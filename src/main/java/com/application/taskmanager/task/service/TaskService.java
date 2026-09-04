@@ -241,6 +241,16 @@ public class TaskService {
             if (request.getMaxReminderCount() != null) def.setMaxReminderCount(request.getMaxReminderCount());
             if (request.getNotifyByEmail() != null) def.setNotifyByEmail(request.getNotifyByEmail());
             if (request.getNotifyByPush() != null) def.setNotifyByPush(request.getNotifyByPush());
+            if (request.getRecurring() != null) {
+                if (request.getRecurring()) {
+                    def.setTaskType(TaskType.DAILY_RECURRING);
+                    def.setRecurrenceType(RecurrenceType.DAILY);
+                } else {
+                    def.setTaskType(TaskType.ONE_TIME);
+                    def.setRecurrenceType(RecurrenceType.NONE);
+                    log.info("Disabled daily recurring for task definition id {}, future occurrences will not be created", def.getId());
+                }
+            }
             taskDefinitionRepository.save(def);
         }
 

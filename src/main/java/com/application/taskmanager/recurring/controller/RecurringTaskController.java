@@ -72,4 +72,13 @@ public class RecurringTaskController {
         RecurringTaskResponse response = recurringTaskService.unlockRecurringTask(currentUser.getId(), id);
         return ResponseEntity.ok(ApiResponse.success("Recurring task unlocked", response));
     }
+
+    @DeleteMapping("/{id}")
+    @Operation(summary = "Stop/Delete recurring task template", description = "Deletes recurring task template definition so future occurrences are no longer created")
+    public ResponseEntity<ApiResponse<Void>> deleteRecurringTask(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @PathVariable("id") Long id) {
+        recurringTaskService.deleteRecurringTask(currentUser.getId(), id);
+        return ResponseEntity.ok(ApiResponse.success("Daily recurring template stopped successfully", null));
+    }
 }

@@ -44,4 +44,6 @@ public class UpdateTaskRequest {
     private Boolean notifyByEmail;
 
     private Boolean notifyByPush;
+
+    private Boolean recurring;
 }

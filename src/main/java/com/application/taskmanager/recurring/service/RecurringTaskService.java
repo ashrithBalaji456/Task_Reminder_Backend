@@ -95,6 +95,15 @@ public class RecurringTaskService {
         return taskMapper.toRecurringTaskResponse(updated);
     }
 
+    @Transactional
+    public void deleteRecurringTask(Long userId, Long recurringTaskId) {
+        TaskDefinition definition = taskDefinitionRepository.findByIdAndUserId(recurringTaskId, userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Recurring task definition not found with id: " + recurringTaskId));
+
+        taskDefinitionRepository.delete(definition);
+        log.info("Deleted recurring task definition id {} for user id {}", recurringTaskId, userId);
+    }
+
     private User getUserOrThrow(Long userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
