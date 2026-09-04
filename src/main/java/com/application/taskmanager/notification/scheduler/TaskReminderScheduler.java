@@ -219,7 +219,7 @@ public class TaskReminderScheduler {
                 for (PushSubscription sub : claimed.activeSubscriptions) {
                     try {
                         log.info("[REMINDER-DISPATCHER] [PUSH] Dispatching VAPID Web Push to endpoint: {}", sub.getEndpoint());
-                        boolean ok = webPushService.sendPushNotification(sub, claimed.pushTitle, claimed.pushBody, "/tasks");
+                        boolean ok = webPushService.sendPushNotification(sub, claimed.pushTitle, claimed.pushBody, "/tasks", claimed.occurrenceId);
                         if (ok) {
                             pushSuccess = true;
                             log.info("[REMINDER-DISPATCHER] [PUSH] VAPID Web Push delivered successfully");
