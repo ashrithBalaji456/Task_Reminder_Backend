@@ -264,21 +264,18 @@ public class TaskService {
 
         TaskDefinition def = occurrence.getTaskDefinition();
 
-        if (def != null && def.getTaskType() == TaskType.DAILY_RECURRING) {
-            // For recurring tasks, set occurrence status to CANCELLED so materializer does not re-create it
-            occurrence.setStatus(TaskStatus.CANCELLED);
-            occurrence.setReminderScheduledAt(null);
-            emailNotificationRepository.cancelPendingNotificationsForOccurrence(occurrenceId);
-            taskOccurrenceRepository.save(occurrence);
-            log.info("Cancelled recurring task occurrence id {} for user id {}", occurrenceId, userId);
-        } else {
-            // For one-time tasks, delete occurrence and definition
-            taskOccurrenceRepository.delete(occurrence);
-            if (def != null && def.getTaskType() == TaskType.ONE_TIME) {
-                taskDefinitionRepository.delete(def);
-            }
-            log.info("Deleted task occurrence id {} for user id {}", occurrenceId, userId);
+        // Cancel any pending notifications for this occurrence
+        emailNotificationRepository.cancelPendingNotificationsForOccurrence(occurrenceId);
+
+        // Permanently delete task occurrence row from database
+        taskOccurrenceRepository.delete(occurrence);
+
+        // If one-time task definition, delete definition as well
+        if (def != null && def.getTaskType() == TaskType.ONE_TIME) {
+            taskDefinitionRepository.delete(def);
         }
+
+        log.info("Permanently deleted task occurrence id {} for user id {}", occurrenceId, userId);
     }
 
     @Transactional
