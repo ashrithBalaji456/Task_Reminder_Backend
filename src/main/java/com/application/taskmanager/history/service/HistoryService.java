@@ -11,6 +11,7 @@ import com.application.taskmanager.task.service.TaskService;
 import com.application.taskmanager.user.entity.User;
 import com.application.taskmanager.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +20,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class HistoryService {
 
@@ -56,6 +58,9 @@ public class HistoryService {
         List<TaskResponse> taskResponses = occurrences.stream()
                 .map(taskMapper::toTaskResponse)
                 .collect(Collectors.toList());
+
+        log.info("[HISTORY] user: {}, date: {}, activeTotal: {}, completed: {}, pending: {}, cancelled: {}, itemsCount: {}",
+                userId, date != null ? date : "ALL", activeTotalTasks, completedTasks, pendingTasks, cancelledTasks, taskResponses.size());
 
         return DailyHistoryResponse.builder()
                 .date(date) // null when viewing all history

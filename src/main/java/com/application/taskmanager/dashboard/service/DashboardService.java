@@ -10,6 +10,7 @@ import com.application.taskmanager.task.service.TaskService;
 import com.application.taskmanager.user.entity.User;
 import com.application.taskmanager.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +19,7 @@ import java.time.ZoneId;
 import java.util.List;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class DashboardService {
 
@@ -66,6 +68,9 @@ public class DashboardService {
         double allTimeCompletionRate = allTimeActive > 0
                 ? Math.round(((double) allTimeCompleted / allTimeActive * 100.0) * 100.0) / 100.0
                 : 0.0;
+
+        log.info("[DASHBOARD] user: {}, queryDate: {}, todayTotal: {}, todayCompleted: {}, todayPending: {}, allTimeTotal: {}, allTimeCompleted: {}, allTimePending: {}, allTimeCancelled: {}",
+                userId, queryDate, activeTotalTasks, completedTasks, pendingTasks, allTimeActive, allTimeCompleted, allTimePending, allTimeCancelled);
 
         return DashboardResponse.builder()
                 .date(queryDate)
