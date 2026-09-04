@@ -159,7 +159,7 @@ public class AnalyticsService {
             dailyMap.put(d, 0L);
         }
 
-        long total = list.size();
+        long total = list.stream().filter(o -> o.getStatus() != TaskStatus.CANCELLED).count();
         long completed = 0, pending = 0, cancelled = 0, moved = 0;
         long highComp = 0, highPend = 0;
 

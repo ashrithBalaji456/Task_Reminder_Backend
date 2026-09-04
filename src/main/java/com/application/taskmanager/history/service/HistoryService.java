@@ -44,22 +44,23 @@ public class HistoryService {
             occurrences = taskOccurrenceRepository.findAllByUserIdOrdered(userId);
         }
 
-        long totalTasks = occurrences.size();
+        long activeTotalTasks = occurrences.stream().filter(o -> o.getStatus() != TaskStatus.CANCELLED).count();
         long completedTasks = occurrences.stream().filter(o -> o.getStatus() == TaskStatus.COMPLETED).count();
         long pendingTasks = occurrences.stream().filter(o -> o.getStatus() == TaskStatus.PENDING).count();
         long cancelledTasks = occurrences.stream().filter(o -> o.getStatus() == TaskStatus.CANCELLED).count();
 
-        double completionPercentage = totalTasks > 0
-                ? Math.round(((double) completedTasks / totalTasks * 100.0) * 100.0) / 100.0
+        double completionPercentage = activeTotalTasks > 0
+                ? Math.round(((double) completedTasks / activeTotalTasks * 100.0) * 100.0) / 100.0
                 : 0.0;
 
         List<TaskResponse> taskResponses = occurrences.stream()
+                .filter(o -> o.getStatus() != TaskStatus.CANCELLED)
                 .map(taskMapper::toTaskResponse)
                 .collect(Collectors.toList());
 
         return DailyHistoryResponse.builder()
                 .date(date) // null when viewing all history
-                .totalTasks(totalTasks)
+                .totalTasks(activeTotalTasks)
                 .completedTasks(completedTasks)
                 .pendingTasks(pendingTasks)
                 .cancelledTasks(cancelledTasks)

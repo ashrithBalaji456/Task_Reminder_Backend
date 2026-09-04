@@ -37,7 +37,7 @@ public class DashboardService {
 
         List<TaskOccurrence> occurrences = taskOccurrenceRepository.findByUserIdAndOccurrenceDate(userId, queryDate);
 
-        long totalTasks = occurrences.size();
+        long activeTotalTasks = occurrences.stream().filter(o -> o.getStatus() != TaskStatus.CANCELLED).count();
         long completedTasks = occurrences.stream().filter(o -> o.getStatus() == TaskStatus.COMPLETED).count();
         long pendingTasks = occurrences.stream().filter(o -> o.getStatus() == TaskStatus.PENDING).count();
         long cancelledTasks = occurrences.stream().filter(o -> o.getStatus() == TaskStatus.CANCELLED).count();
@@ -54,13 +54,13 @@ public class DashboardService {
                 .filter(o -> o.getStatus() == TaskStatus.PENDING && o.getPriority() == Priority.LOW)
                 .count();
 
-        double completionPercentage = totalTasks > 0
-                ? Math.round(((double) completedTasks / totalTasks * 100.0) * 100.0) / 100.0
+        double completionPercentage = activeTotalTasks > 0
+                ? Math.round(((double) completedTasks / activeTotalTasks * 100.0) * 100.0) / 100.0
                 : 0.0;
 
         return DashboardResponse.builder()
                 .date(queryDate)
-                .totalTasks(totalTasks)
+                .totalTasks(activeTotalTasks)
                 .completedTasks(completedTasks)
                 .pendingTasks(pendingTasks)
                 .cancelledTasks(cancelledTasks)
